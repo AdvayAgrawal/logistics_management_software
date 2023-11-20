@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+    <h1>Dashboard</h1>
+    <ul class="list-group">
+        {% for order in orders %}
+            <li class="list-group-item">{{ order.details }} - {{ order.status }}</li>
+        {% endfor %}
+    </ul>
+    <a class="btn btn-success mt-3" href="{{ url_for('create_order') }}">Create Order</a>
+{% endblock %}

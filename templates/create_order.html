@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Order{% endblock %}
+
+{% block content %}
+    <h1>Create Order</h1>
+    <form method="post" action="{{ url_for('create_order') }}">
+        {{ form.csrf_token }}
+        <div class="form-group">
+            {{ form.label(for_='order_details') }}
+            {{ form.order_details(class='form-control', placeholder='Order Details') }}
+            {{ form.errors.order_details }}
+        </div>
+        <button type="submit" class="btn btn-primary">Create Order</button>
+    </form>
+{% endblock %}
