@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block title %}Inventory Alerts{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1>Invertory Alerts</h1>
+        <a class="btn btn-danger" href="{{ url_for('dashboard') }}">Go Back</a>
+    </div>
+    {% if low_inventory_products %}
+        <ul>
+            {% for product in low_inventory_products %}
+                <li class="alert alert-warning">
+                    Inventory alert: {{ product.name }} is below the threshold!
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No inventory alerts at the moment.</p>
+    {% endif %}
+{% endblock %}

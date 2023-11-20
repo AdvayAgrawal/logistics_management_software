@@ -4,10 +4,9 @@
 
 {% block content %}
     <h1>Dashboard</h1>
-    <ul class="list-group">
-        {% for order in orders %}
-            <li class="list-group-item">{{ order.details }} - {{ order.status }}</li>
-        {% endfor %}
-    </ul>
-    <a class="btn btn-success mt-3" href="{{ url_for('create_order') }}">Create Order</a>
+    <a class="btn btn-primary mt-3" href="{{ url_for('view_orders') }}">View Orders</a>
+    {% if current_user.role == 'inventory_manager' %}
+        <a class="btn btn-info mt-3" href="{{ url_for('inventory') }}">View Inventory</a>
+        <a class="btn btn-warning mt-3" href="{{ url_for('alerts') }}">View Alerts</a>
+    {% endif %}
 {% endblock %}
