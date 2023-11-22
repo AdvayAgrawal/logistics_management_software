@@ -64,19 +64,43 @@ class ProductForm(FlaskForm):
 
 def update_inventory(products):
     product_list = [product.strip() for product in products.split(',')]
-    
+    original_quantities = {}
+
+    # Create a dictionary to store the original quantities of products
     for product_name in product_list:
         product = Product.query.filter_by(name=product_name).first()
         if product:
-            product.quantity -= 1  # Assuming each order decreases the quantity by 1
-            if product.quantity < product.threshold:
-                # Trigger an alert (you can handle alerts based on your requirements)
-                flash(f'Alert: Inventory for {product.name} is below the threshold!', 'warning')
+            original_quantities[product_name] = product.quantity
         else:
             # Handle the case where the product is not found in the inventory
             flash(f'Error: Product {product_name} not found in inventory!', 'danger')
-            
+            return False
+
+    # Check if there's enough quantity in the inventory for each product
+    for product_name, original_quantity in original_quantities.items():
+        product = Product.query.filter_by(name=product_name).first()
+        if product.quantity <= 0:
+            flash(f'Error: Insufficient inventory for {product.name}!', 'danger')
+            return False
+        elif original_quantity != product.quantity:
+            # The quantity has changed, indicating another process modified it concurrently
+            flash(f'Error: Inventory for {product.name} was modified concurrently!', 'danger')
+            return False
+
+    # If the checks pass, decrease the quantities
+    for product_name in product_list:
+        product = Product.query.filter_by(name=product_name).first()
+        product.quantity -= 1  # Assuming each order decreases the quantity by 1
+        if product.quantity < product.threshold:
+            # Trigger an alert (you can handle alerts based on your requirements)
+            flash(f'Alert: Inventory for {product.name} is below the threshold!', 'warning')
+
+    # Commit changes to the database
     db.session.commit()
+    return True
+
+
+
 
 @app.route('/')
 def index():
@@ -136,13 +160,22 @@ def logout():
 def create_order():
     form = OrderForm()
     if form.validate_on_submit():
-        new_order = Order(customer_name=form.customer_name.data, products=form.products.data)
+        # Check if the products are available in the inventory
+        if not update_inventory(form.products.data):
+            # If update_inventory returns False, set order status as "failed"
+            new_order = Order(customer_name=form.customer_name.data, products=form.products.data, status="failed")
+            db.session.add(new_order)
+            db.session.commit()
+            flash('Order creation failed. Some products are not available in the inventory.', 'danger')
+            return redirect(url_for('dashboard'))
+
+        new_order = Order(customer_name=form.customer_name.data, products=form.products.data, status="processing")
         db.session.add(new_order)
         db.session.commit()
-        update_inventory(new_order.products)
 
         flash('Order created successfully!', 'success')
         return redirect(url_for('dashboard'))
+
     return render_template('create_order.html', form=form)
 
 @app.route('/inventory')
