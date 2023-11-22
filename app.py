@@ -1,5 +1,6 @@
-from flask import Flask, render_template, redirect, url_for, flash
+from flask import Flask, render_template, redirect, url_for, flash, abort
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import IntegrityError
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, IntegerField, SelectField
 from wtforms.validators import DataRequired, Length, EqualTo
@@ -45,8 +46,9 @@ class RegistrationForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=2, max=20)])
     password = PasswordField('Password', validators=[DataRequired()])
     confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
-    role = SelectField('Role', choices=[('user', 'User'), ('inventory_manager', 'Inventory Manager')], default='user')
+    role = SelectField('Role', choices=[('user', 'User'), ('inventory_manager', 'Inventory Manager'), ('supplier', 'Supplier')], default='user')
     submit = SubmitField('Sign Up')
+
 
 
 class OrderForm(FlaskForm):
@@ -93,6 +95,8 @@ def dashboard():
         products = Product.query.all()
         low_inventory_products = Product.query.filter(Product.quantity < Product.threshold).all()
         return render_template('dashboard.html', orders=orders, products=products, low_inventory_products=low_inventory_products)
+    elif current_user.role == 'supplier':
+        return render_template('dashboard.html')
 
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -135,10 +139,7 @@ def create_order():
         new_order = Order(customer_name=form.customer_name.data, products=form.products.data)
         db.session.add(new_order)
         db.session.commit()
-
-        if current_user.role == 'inventory_manager':
-            # If the user is an inventory manager, update inventory
-            update_inventory(new_order.products)
+        update_inventory(new_order.products)
 
         flash('Order created successfully!', 'success')
         return redirect(url_for('dashboard'))
@@ -149,6 +150,7 @@ def create_order():
 def inventory():
     products = Product.query.all()
     return render_template('inventory.html', products=products)
+
 
 @app.route('/alerts')
 @login_required
@@ -162,6 +164,36 @@ def alerts():
 def view_orders():
     orders = Order.query.all()
     return render_template('view_orders.html', orders=orders)
+
+@app.route('/add_product', methods=['GET', 'POST'])
+@login_required
+def add_product():
+    if current_user.role != 'supplier':
+        abort(403)  # Return a forbidden error for users without the supplier role
+
+    form = ProductForm()
+    if form.validate_on_submit():
+        existing_product = Product.query.filter_by(name=form.name.data).first()
+
+        if existing_product:
+            # If the product with the same name already exists, update the quantity
+            existing_product.quantity += form.quantity.data
+            existing_product.threshold = form.threshold.data
+        else:
+            # If the product doesn't exist, create a new entry
+            new_product = Product(name=form.name.data, quantity=form.quantity.data, threshold=form.threshold.data)
+            db.session.add(new_product)
+
+        try:
+            db.session.commit()
+            flash('Product added to the inventory successfully!', 'success')
+        except IntegrityError:
+            db.session.rollback()
+            flash('An error occurred while adding the product. Please try again.', 'danger')
+
+        return redirect(url_for('dashboard'))
+
+    return render_template('add_product.html', form=form)
 
 
 if __name__ == '__main__':
